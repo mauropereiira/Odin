@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BrainCircuit, Search, Trash2, Pin, Plus, X } from "lucide-react";
+import { BrainCircuit, Search, Trash2, Pin, Plus, X, Maximize2 } from "lucide-react";
 import { api, qk } from "../lib/api";
 import { Markdown } from "../components/Markdown";
 import { Modal } from "../components/Modal";
@@ -12,6 +12,7 @@ export function Brain() {
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [graphOpen, setGraphOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const summary = useQuery({ queryKey: qk.brain, queryFn: api.brain, refetchInterval: 30_000 });
@@ -62,9 +63,21 @@ export function Brain() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_1fr]">
-        <section className="panel flex items-center justify-center p-4">
+        <section className="panel relative flex min-h-[360px] items-center justify-center p-4">
           {graph.data && graph.data.nodes.length > 0 ? (
-            <MemoryGraph graph={graph.data} onSelect={setSelected} />
+            <>
+              <button
+                type="button"
+                onClick={() => setGraphOpen(true)}
+                aria-label="Expand memory graph"
+                title="Expand memory graph"
+                className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-lg border border-line bg-panel-2/90 px-2.5 py-2 readout text-[10px] text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
+              >
+                <Maximize2 size={13} />
+                <span className="hidden sm:inline">Expand</span>
+              </button>
+              <MemoryGraph graph={graph.data} onSelect={setSelected} />
+            </>
           ) : (
             <p className="text-sm text-ink-faint">
               No memories yet — Odin will fill this in as you work.
@@ -137,6 +150,42 @@ export function Brain() {
             <p className="micro-label">Links: {detail.data.links.join(" · ")}</p>
           )}
         </section>
+      )}
+
+      {graphOpen && graph.data && graph.data.nodes.length > 0 && (
+        <Modal labelledBy="expanded-memory-graph-title" onClose={() => setGraphOpen(false)}>
+          <section className="panel flex h-[88vh] w-full max-w-6xl flex-col overflow-hidden shadow-2xl">
+            <header className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3 sm:px-5">
+              <div>
+                <h2 id="expanded-memory-graph-title" className="text-base font-semibold text-ink">
+                  Memory constellation
+                </h2>
+                <p className="mt-0.5 text-xs text-ink-dim">
+                  Select a node to open its memory.
+                </p>
+              </div>
+              <button
+                type="button"
+                data-modal-focus
+                onClick={() => setGraphOpen(false)}
+                aria-label="Close expanded memory graph"
+                className="rounded-lg border border-line p-2 text-ink-faint transition-colors hover:border-line-strong hover:text-ink"
+              >
+                <X size={16} />
+              </button>
+            </header>
+            <div className="min-h-0 flex-1 p-3 sm:p-6">
+              <MemoryGraph
+                graph={graph.data}
+                expanded
+                onSelect={(slug) => {
+                  setSelected(slug);
+                  setGraphOpen(false);
+                }}
+              />
+            </div>
+          </section>
+        </Modal>
       )}
 
       {captureOpen && (

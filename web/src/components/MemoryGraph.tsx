@@ -22,9 +22,11 @@ interface Placed {
 export function MemoryGraph({
   graph,
   onSelect,
+  expanded = false,
 }: {
   graph: MemoryGraphData;
   onSelect?: (slug: string) => void;
+  expanded?: boolean;
 }) {
   const [hover, setHover] = useState<string | null>(null);
   const size = 520;
@@ -71,7 +73,7 @@ export function MemoryGraph({
   return (
     <svg
       viewBox={`0 0 ${size} ${size}`}
-      className="w-full max-w-[560px]"
+      className={expanded ? "h-full min-h-0 w-full" : "w-full max-w-[560px]"}
       role="img"
       aria-label="Memory graph"
     >
@@ -101,7 +103,18 @@ export function MemoryGraph({
             transform={`translate(${p.x},${p.y})`}
             onMouseEnter={() => setHover(p.slug)}
             onMouseLeave={() => setHover(null)}
+            onFocus={() => setHover(p.slug)}
+            onBlur={() => setHover(null)}
             onClick={() => onSelect?.(p.slug)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSelect?.(p.slug);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label={`Open memory ${p.title}`}
             style={{ cursor: "pointer", opacity: dim ? 0.25 : 1 }}
           >
             <circle r={hover === p.slug ? 7 : 5} fill={TYPE_COLOR[p.type] ?? "var(--color-ink-dim)"} />
