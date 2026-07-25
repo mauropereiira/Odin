@@ -1,0 +1,306 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ * Helm design tokens — "Telemetry / Mission Control"
+ * Deep indigo-slate void, hairline instrument grid, one bold Claude-clay
+ * accent reserved for LIVE/ACTIVE, a cool data set that encodes meaning.
+ * ------------------------------------------------------------------ */
+@theme {
+  --color-void: #0a0c10;
+  --color-void-2: #0c0f16;
+  --color-panel: #10141c;
+  --color-panel-2: #171c26;
+  --color-panel-3: #1e2430;
+  --color-line: rgba(148, 163, 184, 0.1);
+  --color-line-strong: rgba(148, 163, 184, 0.2);
+
+  --color-ink: #e7eaf0;
+  --color-ink-dim: #9aa3b4;
+  --color-ink-faint: #616b7d;
+
+  --color-clay: #d97757; /* the one bold accent — live / active / brand */
+  --color-clay-bright: #ef8a68;
+  --color-teal: #5eead4; /* primary data series */
+  --color-iris: #8b9cff; /* secondary (models) */
+  --color-amber: #f5b544; /* attention / auth-needed */
+  --color-rose: #f2688f; /* cost / third series */
+
+  --font-sans: "Geist Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", monospace;
+
+  --radius-panel: 14px;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv01", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Layered ambience: two faint pools of light + an instrument grid. */
+    background-image:
+      radial-gradient(900px 600px at 15% -10%, rgba(217, 119, 87, 0.06), transparent 60%),
+      radial-gradient(1000px 700px at 100% 0%, rgba(94, 234, 212, 0.045), transparent 55%),
+      linear-gradient(var(--color-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-line) 1px, transparent 1px);
+    background-size:
+      100% 100%,
+      100% 100%,
+      44px 44px,
+      44px 44px;
+    background-position:
+      0 0,
+      0 0,
+      -1px -1px,
+      -1px -1px;
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: rgba(217, 119, 87, 0.28);
+  }
+
+  /* Slim, instrument-like scrollbars */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-panel-3);
+    border-radius: 999px;
+    border: 2px solid var(--color-void);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2a3140;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Signature primitives — the instrument readout language
+ * ------------------------------------------------------------------ */
+@layer components {
+  /* Every metric label: tiny, uppercase, wide-tracked, dim. */
+  .micro-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+  }
+
+  /* Tabular mono numerals — numbers are the heroes. */
+  .readout {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "zero";
+    letter-spacing: -0.01em;
+  }
+
+  .panel {
+    background: color-mix(in oklab, var(--color-panel) 88%, transparent);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    backdrop-filter: blur(8px);
+  }
+
+  /* The live pulse used only for genuinely-active telemetry. */
+  .live-dot {
+    position: relative;
+  }
+  .live-dot::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 999px;
+    box-shadow: 0 0 0 0 rgba(217, 119, 87, 0.5);
+    animation: helm-pulse 2s infinite;
+  }
+  @keyframes helm-pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(217, 119, 87, 0.45);
+    }
+    70% {
+      box-shadow: 0 0 0 8px rgba(217, 119, 87, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(217, 119, 87, 0);
+    }
+  }
+
+  /* A value that just changed flashes once. */
+  .flash {
+    animation: helm-flash 0.9s ease-out;
+  }
+  @keyframes helm-flash {
+    0% {
+      color: var(--color-clay-bright);
+    }
+    100% {
+      color: inherit;
+    }
+  }
+
+  /* ---- The Odin mark (a Norse sunburst that dances) ---- */
+  .odin-mark {
+    filter: drop-shadow(0 0 5px rgba(245, 181, 68, 0.25));
+    transition: filter 0.6s ease;
+  }
+  /* Each ray ripples in and out, phase-shifted → a lively dancing wave. */
+  .odin-mark .odin-ray {
+    transform-origin: 24px 24px;
+    transform-box: view-box;
+    animation: odin-dance 1.9s ease-in-out infinite;
+  }
+  /* The whole burst sways gently side to side. */
+  .odin-mark .odin-burst {
+    transform-origin: 24px 24px;
+    transform-box: view-box;
+    animation: odin-sway 7s ease-in-out infinite;
+  }
+  /* Odin's eye blinks now and then. */
+  .odin-mark .odin-core {
+    transform-origin: 24px 24px;
+    transform-box: view-box;
+    animation: odin-blink 4.5s ease-in-out infinite;
+  }
+  /* Awake — sessions are live: brighten and quicken the dance. */
+  .odin-mark.is-active {
+    filter: drop-shadow(0 0 10px rgba(245, 181, 68, 0.6));
+  }
+  .odin-mark.is-active .odin-ray {
+    animation-duration: 1.05s;
+  }
+  .odin-mark.is-active .odin-burst {
+    animation-duration: 4s;
+  }
+  @keyframes odin-dance {
+    0%,
+    100% {
+      transform: scale(1) rotate(0deg);
+    }
+    30% {
+      transform: scale(1.16) rotate(6deg);
+    }
+    60% {
+      transform: scale(0.9) rotate(-4deg);
+    }
+  }
+  @keyframes odin-sway {
+    0%,
+    100% {
+      transform: rotate(-6deg);
+    }
+    50% {
+      transform: rotate(6deg);
+    }
+  }
+  @keyframes odin-blink {
+    0%,
+    90%,
+    100% {
+      transform: scaleY(1);
+    }
+    95% {
+      transform: scaleY(0.12);
+    }
+  }
+
+  /* Sections assemble into place with a short, stagger-friendly entrance. */
+  .rise {
+    animation: helm-rise 450ms ease-out both;
+  }
+  @keyframes helm-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .command-backdrop {
+    background: rgba(6, 8, 12, 0.78);
+    backdrop-filter: blur(8px);
+    animation: command-backdrop-in 160ms ease-out both;
+  }
+  .command-palette {
+    transform-origin: center;
+    animation: command-palette-in 180ms ease-out both;
+  }
+  @keyframes command-backdrop-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes command-palette-in {
+    from {
+      opacity: 0;
+      transform: scale(0.98) translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .agent-cursor {
+    animation: agent-cursor-blink 0.85s steps(1, end) infinite;
+  }
+  @keyframes agent-cursor-blink {
+    0%,
+    45% {
+      opacity: 1;
+    }
+    46%,
+    100% {
+      opacity: 0;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot::after,
+  .flash,
+  .rise,
+  .command-backdrop,
+  .command-palette,
+  .agent-cursor,
+  .odin-mark .odin-ray,
+  .odin-mark .odin-burst,
+  .odin-mark .odin-core {
+    animation: none;
+  }
+
+  .rise {
+    opacity: 1;
+    transform: none;
+  }
+
+  .command-backdrop,
+  .command-palette {
+    opacity: 1;
+    transform: none;
+  }
+
+  .agent-cursor {
+    opacity: 1;
+  }
+}

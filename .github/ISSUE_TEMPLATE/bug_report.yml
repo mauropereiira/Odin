@@ -1,0 +1,37 @@
+name: Bug report
+description: Report reproducible behavior in Odin
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, real transcripts, private notes, account details, or absolute local paths.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide minimal steps using sanitized or synthetic data.
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Odin revision
+      placeholder: Commit SHA or release
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: macOS 15, Node.js 20, Claude Code or Codex version
+  - type: textarea
+    id: verification
+    attributes:
+      label: Additional context
+      description: Sanitized logs, screenshots, or other useful details.
