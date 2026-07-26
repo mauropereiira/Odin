@@ -16,5 +16,6 @@ All notable changes to Odin are documented here.
 ### Security
 
 - Loopback-only HTTP and WebSocket access with strict `Host` and `Origin` validation.
+- Per-process accepted-request limiting and exclusive no-follow creation of security-sensitive files.
 - Owner-only Odin state, path-containment checks, staged model-authored skills, and guarded full-access modes.
 - Demo integration tests that reject imports of live providers, storage, watchers, credentials, and agent state.

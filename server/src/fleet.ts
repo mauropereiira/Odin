@@ -1,11 +1,16 @@
-import { existsSync, statSync } from "node:fs";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { statSync } from "node:fs";
+import { rename } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { startConversation, stopConversation, type AgentEvent } from "./runner.js";
 import type { ProviderId } from "./providers/types.js";
 import { buildRecallBlock } from "./memory/recall.js";
+import {
+  ensurePrivateDirectory,
+  readPrivateTextFile,
+  writePrivateTextFile,
+} from "./private-file.js";
 
 export interface AgentInfo {
   id: string;
@@ -49,15 +54,10 @@ function persistFleet(): Promise<void> {
   }));
   const operation = persistQueue.then(async () => {
       const path = dataPath();
-      await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-      await chmod(dirname(path), 0o700);
+      await ensurePrivateDirectory(dirname(path));
       const temp = `${path}.${process.pid}.tmp`;
-      await writeFile(temp, `${JSON.stringify(snapshot, null, 2)}\n`, {
-        encoding: "utf8",
-        mode: 0o600,
-      });
+      await writePrivateTextFile(temp, `${JSON.stringify(snapshot, null, 2)}\n`);
       await rename(temp, path);
-      await chmod(path, 0o600);
     });
   persistQueue = operation.then(
     () => {
@@ -72,9 +72,11 @@ function persistFleet(): Promise<void> {
 }
 
 export async function initializeFleet(): Promise<void> {
-  if (!existsSync(dataPath())) return;
+  await ensurePrivateDirectory(dirname(dataPath()));
   try {
-    const parsed = JSON.parse(await readFile(dataPath(), "utf8")) as unknown;
+    const stored = await readPrivateTextFile(dataPath());
+    if (!stored) return;
+    const parsed = JSON.parse(stored.contents) as unknown;
     if (!Array.isArray(parsed)) throw new Error("Fleet state must be an array.");
     for (const raw of parsed) {
       if (!raw || typeof raw !== "object") continue;

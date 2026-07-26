@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, readFile, readdir, mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, readdir, mkdir, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -118,6 +118,28 @@ describe("activateSkill / deactivateSkill", () => {
     expect(await activateSkill("keep")).toBe(false);
     expect(await readFile(join(active, "SKILL.md"), "utf8")).toContain("mine");
   });
+  it("activate refuses a symlinked active skill", async () => {
+    await writeForgedSkill({ name: "Keep", description: "auto", steps: ["x"], sourceSession: "s" });
+    const active = join(dir, "skills", "keep");
+    const outside = join(dir, "manual-skill.md");
+    await mkdir(active, { recursive: true });
+    await writeFile(outside, "---\nname: keep\n---\n# Keep\nmine", "utf8");
+    await symlink(outside, join(active, "SKILL.md"));
+    await expect(activateSkill("keep")).rejects.toThrow();
+    expect(await readFile(outside, "utf8")).toContain("mine");
+  });
+  it("listing skips a symlinked skill without hiding valid siblings", async () => {
+    await ensureOdinPlugin();
+    const invalid = join(dir, "skills", "aaa-invalid");
+    const valid = join(dir, "skills", "zzz-valid");
+    const outside = join(dir, "manual-skill.md");
+    await mkdir(invalid, { recursive: true });
+    await writeFile(outside, "manual", "utf8");
+    await symlink(outside, join(invalid, "SKILL.md"));
+    await mkdir(valid, { recursive: true });
+    await writeFile(join(valid, "SKILL.md"), "---\nforged: true\n---\n# Valid", "utf8");
+    expect(await listForgedSlugs()).toContainEqual({ slug: "zzz-valid", active: true });
+  });
   it("refuses to deactivate a hand-authored skill", async () => {
     const active = join(dir, "skills", "manual");
     await mkdir(active, { recursive: true });
@@ -146,6 +168,8 @@ describe("deleteForgedSkill", () => {
     await writeFile(join(dir, "outside", "SKILL.md"), "secret", "utf8");
     expect(await deleteForgedSkill("../outside")).toBe(false);
     expect(await readFile(join(dir, "outside", "SKILL.md"), "utf8")).toBe("secret");
+    expect(await activateSkill("../outside")).toBe(false);
+    expect(await deactivateSkill("../outside")).toBe(false);
   });
   it("refuses to delete a hand-authored skill inside Odin's roots", async () => {
     const active = join(dir, "skills", "manual");

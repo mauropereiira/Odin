@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, readFile, readdir, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -38,6 +38,17 @@ describe("ensureForge", () => {
     await ensureForge();
     expect(await readFile(p, "utf8")).toBe("MINE");
   });
+  it("refuses a symlinked Forge subdirectory", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "odin-brain-outside-"));
+    try {
+      await mkdir(outside, { recursive: true });
+      await symlink(outside, join(dir, "notes"));
+      await expect(ensureForge()).rejects.toThrow("Refusing non-directory private path");
+      expect(await readdir(outside)).toEqual([]);
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("write / read / list", () => {
@@ -60,8 +71,20 @@ describe("write / read / list", () => {
     const slugs = (await listMemorySlugs()).map((s) => s.slug).sort();
     expect(slugs).toEqual(["a", "b"]);
   });
+  it("round-trips slugs containing Unicode combining marks", async () => {
+    await writeMemory({ slug: "বাংলা", frontmatter: { type: "fact" }, body: "Unicode" });
+    expect((await readMemory("বাংলা"))?.body).toContain("Unicode");
+    expect((await listMemorySlugs()).map((memory) => memory.slug)).toContain("বাংলা");
+  });
   it("returns null for a missing memory", async () => {
     expect(await readMemory("nope")).toBeNull();
+  });
+  it("rejects unsafe slugs before filesystem access", async () => {
+    await expect(writeMemory({ slug: "../escape", frontmatter: {}, body: "x" })).rejects.toThrow(
+      "Invalid memory slug",
+    );
+    expect(await readMemory("../escape")).toBeNull();
+    expect(await trashMemory("../escape")).toBe(false);
   });
 });
 

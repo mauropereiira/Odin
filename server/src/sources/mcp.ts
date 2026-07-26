@@ -1,16 +1,9 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { paths } from "../claudePaths.js";
 import type { McpServer } from "../types.js";
 
 /** Read global, project, and installed-plugin MCP configuration as plain DTOs. */
-
-interface CachedJson {
-  mtimeMs: number;
-  value: unknown;
-}
-
-const jsonCache = new Map<string, CachedJson>();
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -20,14 +13,8 @@ function record(value: unknown): Record<string, unknown> | null {
 
 async function readJson(filePath: string): Promise<unknown | null> {
   try {
-    const mtimeMs = (await stat(filePath)).mtimeMs;
-    const hit = jsonCache.get(filePath);
-    if (hit?.mtimeMs === mtimeMs) return hit.value;
-    const value = JSON.parse(await readFile(filePath, "utf8")) as unknown;
-    jsonCache.set(filePath, { mtimeMs, value });
-    return value;
+    return JSON.parse(await readFile(filePath, "utf8")) as unknown;
   } catch {
-    jsonCache.delete(filePath);
     return null;
   }
 }
@@ -176,6 +163,6 @@ export const mcp = {
   },
 
   invalidate() {
-    jsonCache.clear();
+    // Reads are uncached so plugin configs outside Claude's watched roots stay fresh.
   },
 };

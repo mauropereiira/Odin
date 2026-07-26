@@ -32,6 +32,7 @@ export default defineConfig({
     timeout: 30_000,
     env: {
       ODIN_DEMO: "1",
+      ODIN_RATE_LIMIT_MAX: "10000",
       HELM_PORT: String(port),
     },
   },

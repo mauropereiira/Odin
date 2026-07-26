@@ -106,6 +106,11 @@ Only one run can be active for a conversation. Provider choice cannot change aft
 
 Only one run can be active for an agent; separate agents can run concurrently.
 
+## Request Limits
+
+Accepted HTTP requests and WebSocket handshakes share an in-memory per-process loopback limit. Exceeding the
+configured threshold returns `429` with code `ODIN_RATE_LIMITED` and a `Retry-After` header.
+
 ## WebSocket
 
 Connect to `/ws`. Server frames are JSON objects with one of these shapes:

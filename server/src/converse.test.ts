@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -95,5 +95,26 @@ describe("converse registry", () => {
       project: "x",
     })).rejects.toThrow();
     expect(await readFile(path, "utf8")).toBe("not json");
+  });
+  it("rejects traversal-like conversation ids", async () => {
+    await recordConverseSession({ id: "../escape", message: "x", cwd: "/x", project: "x" });
+    expect(await listConverseSessions()).toEqual([]);
+    await expect(
+      appendConverseRecord("../escape", { kind: "user", text: "x", at: "now" }),
+    ).rejects.toThrow("Invalid conversation id");
+    expect(await readConverseRecords("../escape")).toEqual([]);
+    expect(await removeConverseSession("../escape")).toBe(false);
+  });
+  it("refuses a symlinked conversation directory", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "odin-converse-outside-"));
+    try {
+      await symlink(outside, join(dir, "conversations"));
+      await expect(
+        appendConverseRecord("safe-id", { kind: "user", text: "x", at: "now" }),
+      ).rejects.toThrow("Refusing non-directory private path");
+      expect(await readdir(outside)).toEqual([]);
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
   });
 });

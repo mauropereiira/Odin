@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import websocket from "@fastify/websocket";
 import fastifyStatic from "@fastify/static";
+import rateLimit from "@fastify/rate-limit";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename } from "node:path";
@@ -52,6 +53,8 @@ import {
 } from "./fleet.js";
 import type { ChangeEvent } from "./types.js";
 import { isLoopbackHost, isLoopbackOrigin, isRequestNamespace } from "./security.js";
+import { isSafeSlug } from "./validation.js";
+import { requestLimitMax } from "./rate-limit.js";
 
 const PORT = Number(process.env.HELM_PORT || 7420);
 const CHECKOUT_ROOT = fileURLToPath(new URL("../../", import.meta.url)).replace(/\/$/, "");
@@ -76,15 +79,19 @@ app.addHook("onRequest", async (req, reply) => {
   }
 });
 
-/**
- * A safe note/skill slug: our slugs are Unicode letters/numbers/hyphens only
- * (Moldavite's rule). This rejects path-traversal payloads (`..`, `/`, `\`, null
- * bytes, dots) before a slug is ever joined into a filesystem path.
- */
-const SAFE_SLUG = /^[\p{L}\p{N}-]{1,128}$/u;
-function isSafeSlug(slug: string): boolean {
-  return SAFE_SLUG.test(slug);
-}
+await app.register(rateLimit, {
+  global: true,
+  hook: "onRequest",
+  max: requestLimitMax(),
+  timeWindow: "1 minute",
+  keyGenerator: (request) => request.ip,
+  errorResponseBuilder: (_request, context) => ({
+    statusCode: context.statusCode,
+    error: "Too many requests. Try again shortly.",
+    code: "ODIN_RATE_LIMITED",
+    retryAfterMs: context.ttl,
+  }),
+});
 
 await app.register(websocket);
 
@@ -588,18 +595,20 @@ if (existsSync(webDist)) {
   // wildcard: true (the default) serves files dynamically from disk per request,
   // so a fresh `npm run build` is picked up without restarting the server.
   await app.register(fastifyStatic, { root: webDist });
-  app.setNotFoundHandler((req, reply) => {
-    if (
-      (req.method === "GET" || req.method === "HEAD")
-      && !isRequestNamespace(req.url, "/api")
-      && !isRequestNamespace(req.url, "/ws")
-    ) {
-      return reply.sendFile("index.html"); // SPA client routes (/brain, /skills, …)
-    }
-    return reply.code(404).send({ error: "not found" });
-  });
   console.log(`ᛟ Serving web UI from ${webDist}`);
 }
+
+app.setNotFoundHandler({ preHandler: app.rateLimit() }, (req, reply) => {
+  if (
+    existsSync(webDist)
+    && (req.method === "GET" || req.method === "HEAD")
+    && !isRequestNamespace(req.url, "/api")
+    && !isRequestNamespace(req.url, "/ws")
+  ) {
+    return reply.sendFile("index.html"); // SPA client routes (/brain, /skills, …)
+  }
+  return reply.code(404).send({ error: "not found" });
+});
 
 try {
   await app.listen({ port: PORT, host: "127.0.0.1" });
