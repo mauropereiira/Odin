@@ -37,7 +37,7 @@ export function useFleet() {
   const [dispatching, setDispatching] = useState(false);
   const recordsRef = useRef(records);
   const socketRef = useRef<WebSocket | null>(null);
-  const retryRef = useRef<ReturnType<typeof setTimeout>>();
+  const retryRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     recordsRef.current = records;

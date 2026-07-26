@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 20.19+, 22.12+, or 24+ (Node.js 21 and 23 are not supported)
 - npm
 - A modern browser
 - Claude Code, Codex, or both for agent execution

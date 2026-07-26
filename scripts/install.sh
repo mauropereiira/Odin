@@ -48,8 +48,9 @@ resolve_optional_executable() {
 # non-shell executable used by the app while the installer has the user's PATH.
 NODE="$(resolve_executable node)"
 NODE_MAJOR="$("${NODE}" -p 'process.versions.node.split(".")[0]')"
-if (( NODE_MAJOR < 20 )); then
-  echo "Odin requires Node.js 20 or newer (found $("${NODE}" --version))." >&2
+NODE_MINOR="$("${NODE}" -p 'process.versions.node.split(".")[1]')"
+if (( NODE_MAJOR < 20 || (NODE_MAJOR == 20 && NODE_MINOR < 19) || NODE_MAJOR == 21 || (NODE_MAJOR == 22 && NODE_MINOR < 12) || NODE_MAJOR == 23 )); then
+  echo "Odin requires Node.js 20.19+, 22.12+, or 24+; Node.js 21 and 23 are unsupported (found $("${NODE}" --version))." >&2
   exit 1
 fi
 NPM="$(resolve_executable npm)"
