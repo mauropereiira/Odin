@@ -1,8 +1,17 @@
-import { readFileSync, existsSync } from "node:fs";
-import { chmod, mkdir, readFile, writeFile, readdir, stat, rename } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { lstat, readdir, rename } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import YAML from "yaml";
+import {
+  ensurePrivateDirectory,
+  ensurePrivateTextFile,
+  hardenPrivateFile,
+  readPrivateTextFile,
+  updatePrivateTextFile,
+  writePrivateTextFile,
+} from "../private-file.js";
+import { isSafeSlug } from "../validation.js";
 
 /** True iff `target` resolves to `base` or something inside it (anti-traversal). */
 function contains(base: string, target: string): boolean {
@@ -138,14 +147,13 @@ or \`.odin-trash/\`.
 const GITIGNORE = ".trash/\n.plugins/\n.index/\n.odin-trash/\n.DS_Store\n";
 
 async function privateDir(path: string): Promise<void> {
-  await mkdir(path, { recursive: true, mode: 0o700 });
-  await chmod(path, 0o700);
+  await ensurePrivateDirectory(path);
 }
 
 async function hardenMarkdownFiles(path: string): Promise<void> {
   for (const entry of await readdir(path, { withFileTypes: true })) {
     if (entry.isFile() && entry.name.endsWith(".md")) {
-      await chmod(join(path, entry.name), 0o600);
+      await hardenPrivateFile(join(path, entry.name));
     }
   }
 }
@@ -156,11 +164,9 @@ export async function ensureForge(): Promise<void> {
   await privateDir(notesDir());
   await privateDir(dailyDir());
   const agents = join(brainDir(), "AGENTS.md");
-  if (!existsSync(agents)) await writeFile(agents, AGENTS_MD, { encoding: "utf8", mode: 0o600 });
-  await chmod(agents, 0o600);
+  await ensurePrivateTextFile(agents, AGENTS_MD);
   const gi = join(brainDir(), ".gitignore");
-  if (!existsSync(gi)) await writeFile(gi, GITIGNORE, { encoding: "utf8", mode: 0o600 });
-  await chmod(gi, 0o600);
+  await ensurePrivateTextFile(gi, GITIGNORE);
   await Promise.all([hardenMarkdownFiles(notesDir()), hardenMarkdownFiles(dailyDir())]);
 }
 
@@ -169,19 +175,21 @@ export async function writeMemory(m: {
   frontmatter: Record<string, unknown>;
   body: string;
 }): Promise<string> {
+  if (!isSafeSlug(m.slug)) throw new Error("Invalid memory slug.");
   await ensureForge();
   const path = join(notesDir(), `${m.slug}.md`);
-  await writeFile(path, serializeNote(m.frontmatter, m.body), { encoding: "utf8", mode: 0o600 });
-  await chmod(path, 0o600);
+  await writePrivateTextFile(path, serializeNote(m.frontmatter, m.body));
   return path;
 }
 
 export async function readMemory(slug: string): Promise<StoredMemory | null> {
+  if (!isSafeSlug(slug)) return null;
   const path = join(notesDir(), `${slug}.md`);
   try {
-    const [raw, st] = await Promise.all([readFile(path, "utf8"), stat(path)]);
-    const { frontmatter, body } = parseNote(raw);
-    return { slug, path, frontmatter, body, mtimeMs: st.mtimeMs };
+    const stored = await readPrivateTextFile(path);
+    if (!stored) return null;
+    const { frontmatter, body } = parseNote(stored.contents);
+    return { slug, path, frontmatter, body, mtimeMs: stored.mtimeMs };
   } catch {
     return null;
   }
@@ -198,11 +206,13 @@ export async function listMemorySlugs(): Promise<{ slug: string; path: string; m
   const out: { slug: string; path: string; mtimeMs: number }[] = [];
   for (const entry of entries) {
     if (entry.startsWith(".") || !entry.endsWith(".md")) continue;
+    const slug = entry.replace(/\.md$/, "");
+    if (!isSafeSlug(slug)) continue;
     const path = join(notesDir(), entry);
     try {
-      const st = await stat(path);
+      const st = await lstat(path);
       if (!st.isFile()) continue;
-      out.push({ slug: entry.replace(/\.md$/, ""), path, mtimeMs: st.mtimeMs });
+      out.push({ slug, path, mtimeMs: st.mtimeMs });
     } catch {
       /* skip unreadable */
     }
@@ -212,30 +222,30 @@ export async function listMemorySlugs(): Promise<{ slug: string; path: string; m
 
 /** Append one bullet to today's daily note; no duplicate lines. */
 export async function appendDailyBullet(dateISO: string, bullet: string): Promise<void> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) throw new Error("Invalid daily note date.");
   await ensureForge();
   const path = join(dailyDir(), `${dateISO}.md`);
-  let existing = "";
-  try {
-    existing = await readFile(path, "utf8");
-  } catch {
-    /* new file */
-  }
-  if (existing.includes(bullet)) return;
-  const next = existing.trim()
-    ? `${existing.trimEnd()}\n${bullet}\n`
-    : `# ${dateISO}\n\n${bullet}\n`;
-  await writeFile(path, next, { encoding: "utf8", mode: 0o600 });
-  await chmod(path, 0o600);
+  await updatePrivateTextFile(path, (existing) => {
+    if (existing.includes(bullet)) return existing;
+    return existing.trim()
+      ? `${existing.trimEnd()}\n${bullet}\n`
+      : `# ${dateISO}\n\n${bullet}\n`;
+  });
 }
 
 /** Soft-delete: move a note into an Odin-managed .odin-trash (Moldavite ignores dotdirs). */
 export async function trashMemory(slug: string): Promise<boolean> {
+  if (!isSafeSlug(slug)) return false;
   const src = join(notesDir(), `${slug}.md`);
   if (!contains(notesDir(), src)) return false; // anti-traversal
-  if (!existsSync(src)) return false;
   const trashDir = join(brainDir(), ".odin-trash");
   await privateDir(trashDir);
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  await rename(src, join(trashDir, `${slug}-${stamp}.md`));
-  return true;
+  try {
+    await rename(src, join(trashDir, `${slug}-${stamp}.md`));
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
 }

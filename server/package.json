@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^11.1.0",
     "@fastify/static": "^10.1.2",
     "@fastify/websocket": "^11.0.1",
     "@modelcontextprotocol/sdk": "^1.29.0",

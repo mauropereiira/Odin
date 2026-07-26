@@ -13,6 +13,7 @@ Implemented boundaries:
 - Fastify listens only on `127.0.0.1`.
 - Requests and WebSocket upgrades require a loopback `Host`.
 - A supplied `Origin` must also be loopback.
+- Accepted HTTP requests and WebSocket handshakes have a bounded per-process loopback rate.
 - Provider processes are spawned directly without a shell.
 - API inputs and provider options are schema-validated.
 - Memory and skill slugs reject traversal syntax.

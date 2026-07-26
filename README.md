@@ -111,6 +111,7 @@ Read [Architecture](docs/architecture.md) for the lifecycle and component bounda
 ## Safety Model
 
 - The server binds to `127.0.0.1` and rejects non-loopback `Host` and `Origin` values.
+- Accepted HTTP requests and WebSocket handshakes are rate-limited in memory.
 - Provider processes are launched without a shell.
 - Paths, models, access modes, slugs, and request bodies are validated.
 - Dangerous full-access modes are disabled unless `ODIN_ALLOW_BYPASS=1` is set.

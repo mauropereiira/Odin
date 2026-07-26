@@ -1,8 +1,15 @@
-import { appendFile, chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { rename, rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AgentEvent, ProviderId } from "./providers/types.js";
+import {
+  appendPrivateTextFile,
+  ensurePrivateDirectory,
+  readPrivateTextFile,
+  writePrivateTextFile,
+} from "./private-file.js";
+import { isSafeLocalId } from "./validation.js";
 
 export interface ConverseSession {
   id: string;
@@ -34,13 +41,14 @@ function transcriptDir(): string {
 }
 
 function transcriptPath(id: string): string {
+  if (!isSafeLocalId(id)) throw new Error("Invalid conversation id.");
   return join(transcriptDir(), `${id}.jsonl`);
 }
 
 function normalizeSession(raw: unknown): ConverseSession | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
-  if (typeof value.id !== "string" || !value.id) return null;
+  if (typeof value.id !== "string" || !isSafeLocalId(value.id)) return null;
   const provider: ProviderId = value.provider === "codex" ? "codex" : "claude-code";
   return {
     id: value.id,
@@ -65,14 +73,12 @@ function normalizeSession(raw: unknown): ConverseSession | null {
 }
 
 async function loadAll(): Promise<ConverseSession[]> {
-  try {
-    const raw = JSON.parse(await readFile(storePath(), "utf8")) as unknown;
-    if (!Array.isArray(raw)) throw new Error("Conversation registry must be an array.");
-    return raw.map(normalizeSession).filter((session): session is ConverseSession => Boolean(session));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw error;
-  }
+  await ensurePrivateDirectory(dataDir());
+  const stored = await readPrivateTextFile(storePath());
+  if (!stored) return [];
+  const raw = JSON.parse(stored.contents) as unknown;
+  if (!Array.isArray(raw)) throw new Error("Conversation registry must be an array.");
+  return raw.map(normalizeSession).filter((session): session is ConverseSession => Boolean(session));
 }
 
 let metadataWrite = Promise.resolve();
@@ -82,15 +88,10 @@ function mutateAll(
   const operation = metadataWrite.then(async () => {
     const sessions = await loadAll();
     mutate(sessions);
-    await mkdir(dataDir(), { recursive: true, mode: 0o700 });
-    await chmod(dataDir(), 0o700);
+    await ensurePrivateDirectory(dataDir());
     const temp = `${storePath()}.${process.pid}.tmp`;
-    await writeFile(temp, `${JSON.stringify(sessions, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
+    await writePrivateTextFile(temp, `${JSON.stringify(sessions, null, 2)}\n`);
     await rename(temp, storePath());
-    await chmod(storePath(), 0o600);
     return sessions;
   });
   metadataWrite = operation.then(
@@ -138,7 +139,7 @@ export async function recordConverseSession(input: {
   model?: string;
   permissionMode?: string;
 }): Promise<void> {
-  if (!input.id) return;
+  if (!isSafeLocalId(input.id)) return;
   await mutateAll((sessions) => {
     const now = new Date().toISOString();
     const existing = sessions.find((session) => session.id === input.id);
@@ -169,6 +170,7 @@ export async function updateConverseSession(
   id: string,
   patch: Partial<Pick<ConverseSession, "nativeSessionId" | "model" | "permissionMode">>,
 ): Promise<void> {
+  if (!isSafeLocalId(id)) return;
   await mutateAll((sessions) => {
     const session = sessions.find((candidate) => candidate.id === id);
     if (!session) return;
@@ -180,6 +182,7 @@ export async function updateConverseSession(
 }
 
 export async function getConverseSession(id: string): Promise<ConverseSession | null> {
+  if (!isSafeLocalId(id)) return null;
   await metadataWrite;
   return (await loadAll()).find((session) => session.id === id) ?? null;
 }
@@ -192,17 +195,17 @@ export async function listConverseSessions(): Promise<ConverseSession[]> {
 const transcriptWrites = new Map<string, Promise<void>>();
 const deletedConversations = new Set<string>();
 export function appendConverseRecord(id: string, record: ConverseRecord): Promise<void> {
+  if (!isSafeLocalId(id)) return Promise.reject(new Error("Invalid conversation id."));
   if (deletedConversations.has(id)) return Promise.reject(new Error("Conversation was deleted."));
   const previous = transcriptWrites.get(id) ?? Promise.resolve();
   const operation = previous.then(async () => {
     if (deletedConversations.has(id)) throw new Error("Conversation was deleted.");
-    await mkdir(transcriptDir(), { recursive: true, mode: 0o700 });
-    await chmod(transcriptDir(), 0o700);
-    await appendFile(transcriptPath(id), `${JSON.stringify(limitValue(record, 0))}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    await chmod(transcriptPath(id), 0o600);
+    await ensurePrivateDirectory(dataDir());
+    await ensurePrivateDirectory(transcriptDir());
+    await appendPrivateTextFile(
+      transcriptPath(id),
+      `${JSON.stringify(limitValue(record, 0))}\n`,
+    );
   });
   const tracked = operation.catch(() => undefined).finally(() => {
     if (transcriptWrites.get(id) === tracked) transcriptWrites.delete(id);
@@ -212,10 +215,15 @@ export function appendConverseRecord(id: string, record: ConverseRecord): Promis
 }
 
 export async function readConverseRecords(id: string): Promise<ConverseRecord[]> {
+  if (!isSafeLocalId(id)) return [];
   try {
     await transcriptWrites.get(id);
+    await ensurePrivateDirectory(dataDir());
+    await ensurePrivateDirectory(transcriptDir());
     const records: ConverseRecord[] = [];
-    for (const line of (await readFile(transcriptPath(id), "utf8")).split("\n")) {
+    const stored = await readPrivateTextFile(transcriptPath(id));
+    if (!stored) return [];
+    for (const line of stored.contents.split("\n")) {
       if (!line.trim()) continue;
       try {
         const record = JSON.parse(line) as ConverseRecord;
@@ -231,6 +239,7 @@ export async function readConverseRecords(id: string): Promise<ConverseRecord[]>
 }
 
 export async function removeConverseSession(id: string): Promise<boolean> {
+  if (!isSafeLocalId(id)) return false;
   let removed = false;
   await mutateAll((sessions) => {
     const index = sessions.findIndex((session) => session.id === id);

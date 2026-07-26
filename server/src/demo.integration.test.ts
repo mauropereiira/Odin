@@ -106,6 +106,7 @@ beforeAll(async () => {
         HOME: join(root, "home"),
         HELM_PORT: String(port),
         ODIN_DEMO: "1",
+        ODIN_RATE_LIMIT_MAX: "50",
         ODIN_BRAIN_DIR: brainPath,
         ODIN_DATA_DIR: dataPath,
         ODIN_SKILLS_DIR: skillsPath,
@@ -200,6 +201,13 @@ describe("ODIN_DEMO API boundary", () => {
     expect(mutation.status).toBe(403);
     expect(JSON.parse(mutation.body)).toMatchObject({ code: "ODIN_DEMO_READ_ONLY" });
 
+    const malformed = await fetchApi("/api/brain/memories", {
+      method: "POST",
+      body: "{",
+    });
+    expect(malformed.status).toBe(403);
+    expect(JSON.parse(malformed.body)).toMatchObject({ code: "ODIN_DEMO_READ_ONLY" });
+
     const unknown = await fetchApi("/api/future-live-handler");
     expect(unknown.status).toBe(404);
     expect(JSON.parse(unknown.body)).toMatchObject({ code: "ODIN_DEMO_NOT_FOUND" });
@@ -210,5 +218,15 @@ describe("ODIN_DEMO API boundary", () => {
       expect(await readdir(path)).toEqual(["canary.txt"]);
       expect(await readFile(join(path, "canary.txt"), "utf8")).toBe("must remain untouched\n");
     }
+  });
+
+  it("bounds repeated loopback requests", async () => {
+    let response: Response | null = null;
+    for (let index = 0; index < 60; index++) {
+      response = await fetchApi("/not-found-rate-limit-target");
+      if (response.status === 429) break;
+    }
+    expect(response?.status).toBe(429);
+    expect(JSON.parse(response?.body ?? "{}")).toMatchObject({ code: "ODIN_RATE_LIMITED" });
   });
 });

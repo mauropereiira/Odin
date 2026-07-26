@@ -1,8 +1,15 @@
-import { existsSync } from "node:fs";
-import { chmod, mkdir, readFile, writeFile, readdir, rename, rm, realpath } from "node:fs/promises";
+import { chmod, readdir, rename, rm, realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { parseNote, serializeNote, slugify } from "../memory/forge.js";
+import {
+  ensurePrivateDirectory,
+  ensurePrivateTextFile,
+  hardenPrivateFile,
+  readPrivateTextFile,
+  writePrivateTextFile,
+} from "../private-file.js";
+import { isSafeSlug } from "../validation.js";
 
 /**
  * The forge — the only writer of Odin's own skills plugin. Forged skills are a
@@ -74,16 +81,12 @@ export async function ensureOdinPlugin(): Promise<void> {
   const manifestDir = join(odinSkillsDir(), ".claude-plugin");
   await privateDir(manifestDir);
   const manifest = join(manifestDir, "plugin.json");
-  if (!existsSync(manifest)) {
-    await writeFile(manifest, `${MANIFEST}\n`, { encoding: "utf8", mode: 0o600 });
-  }
-  await chmod(manifest, 0o600);
+  await ensurePrivateTextFile(manifest, `${MANIFEST}\n`);
   await Promise.all([hardenSkillRoot(skillsRoot()), hardenSkillRoot(stagedRoot())]);
 }
 
 async function privateDir(path: string): Promise<void> {
-  await mkdir(path, { recursive: true, mode: 0o700 });
-  await chmod(path, 0o700);
+  await ensurePrivateDirectory(path);
 }
 
 async function hardenSkillRoot(root: string): Promise<void> {
@@ -92,7 +95,7 @@ async function hardenSkillRoot(root: string): Promise<void> {
     const dir = join(root, entry.name);
     const file = join(dir, "SKILL.md");
     await chmod(dir, 0o700);
-    if (existsSync(file)) await chmod(file, 0o600);
+    await hardenPrivateFile(file);
   }
 }
 
@@ -106,26 +109,22 @@ export interface ForgeSkillInput {
 
 /** True if a SKILL.md in `dir` exists and was NOT forged by us. */
 async function isProtectedDir(dir: string): Promise<boolean> {
-  try {
-    const { frontmatter } = parseNote(await readFile(join(dir, "SKILL.md"), "utf8"));
-    return frontmatter.forged !== true;
-  } catch {
-    return false; // absent → not protected
-  }
+  const stored = await readPrivateTextFile(join(dir, "SKILL.md"));
+  if (!stored) return false;
+  const { frontmatter } = parseNote(stored.contents);
+  return frontmatter.forged !== true;
 }
 
 async function isForgedDir(dir: string): Promise<boolean> {
-  try {
-    const { frontmatter } = parseNote(await readFile(join(dir, "SKILL.md"), "utf8"));
-    return frontmatter.forged === true;
-  } catch {
-    return false;
-  }
+  const stored = await readPrivateTextFile(join(dir, "SKILL.md"));
+  if (!stored) return false;
+  const { frontmatter } = parseNote(stored.contents);
+  return frontmatter.forged === true;
 }
 
 export async function writeForgedSkill(input: ForgeSkillInput): Promise<string | null> {
   const slug = slugify(input.name);
-  if (!slug || slug === "untitled") return null;
+  if (!isSafeSlug(slug) || slug === "untitled") return null;
 
   await ensureOdinPlugin();
   // Never shadow a non-forged skill the user keeps in the active dir.
@@ -143,14 +142,12 @@ export async function writeForgedSkill(input: ForgeSkillInput): Promise<string |
   let created = now;
   // Preserve the original created date from a prior staged or active version.
   for (const prior of [path, join(skillsRoot(), slug, "SKILL.md")]) {
-    try {
-      const fm = parseNote(await readFile(prior, "utf8")).frontmatter;
-      if (typeof fm.created === "string") {
-        created = fm.created;
-        break;
-      }
-    } catch {
-      /* not present */
+    const stored = await readPrivateTextFile(prior);
+    if (stored) {
+      const fm = parseNote(stored.contents).frontmatter;
+      if (typeof fm.created !== "string") continue;
+      created = fm.created;
+      break;
     }
   }
 
@@ -168,8 +165,7 @@ export async function writeForgedSkill(input: ForgeSkillInput): Promise<string |
     .map((s, i) => `${i + 1}. ${scrubUrls(s)}`)
     .join("\n");
   const body = `# ${scrubUrls(input.name)}\n\n## Steps\n${steps}`;
-  await writeFile(path, serializeNote(frontmatter, body), { encoding: "utf8", mode: 0o600 });
-  await chmod(path, 0o600);
+  await writePrivateTextFile(path, serializeNote(frontmatter, body));
   return path;
 }
 
@@ -183,8 +179,12 @@ export async function listForgedSlugs(): Promise<{ slug: string; active: boolean
     try {
       const entries = await readdir(base, { withFileTypes: true });
       for (const e of entries) {
-        if (e.isDirectory() && !e.name.startsWith(".") && existsSync(join(base, e.name, "SKILL.md")))
-          out.push({ slug: e.name, active });
+        if (!e.isDirectory() || !isSafeSlug(e.name)) continue;
+        try {
+          if (await isForgedDir(join(base, e.name))) out.push({ slug: e.name, active });
+        } catch {
+          /* skip unsafe or unreadable skill entries without hiding valid siblings */
+        }
       }
     } catch {
       /* dir absent */
@@ -195,15 +195,15 @@ export async function listForgedSlugs(): Promise<{ slug: string; active: boolean
 
 /** Move a staged skill into the loaded plugin dir. */
 export async function activateSkill(slug: string): Promise<boolean> {
+  if (!isSafeSlug(slug)) return false;
   const from = join(stagedRoot(), slug);
   const to = join(skillsRoot(), slug);
   if (!contains(stagedRoot(), from) || !contains(skillsRoot(), to)) return false;
-  if (!existsSync(join(from, "SKILL.md"))) return false;
   if (!(await realContained(stagedRoot(), from))) return false; // symlink guard
   if (!(await isForgedDir(from))) return false;
   if (await isProtectedDir(to)) return false; // never replace a non-forged active skill
   await privateDir(skillsRoot());
-  if (existsSync(to)) await rm(to, { recursive: true, force: true });
+  await rm(to, { recursive: true, force: true });
   await rename(from, to);
   await chmod(to, 0o700);
   return true;
@@ -211,14 +211,14 @@ export async function activateSkill(slug: string): Promise<boolean> {
 
 /** Move an active skill back to staging (no longer loaded). */
 export async function deactivateSkill(slug: string): Promise<boolean> {
+  if (!isSafeSlug(slug)) return false;
   const from = join(skillsRoot(), slug);
   const to = join(stagedRoot(), slug);
   if (!contains(skillsRoot(), from) || !contains(stagedRoot(), to)) return false;
-  if (!existsSync(join(from, "SKILL.md"))) return false;
   if (!(await realContained(skillsRoot(), from))) return false; // symlink guard
   if (!(await isForgedDir(from))) return false;
   await privateDir(stagedRoot());
-  if (existsSync(to)) await rm(to, { recursive: true, force: true });
+  await rm(to, { recursive: true, force: true });
   await rename(from, to);
   await chmod(to, 0o700);
   return true;
@@ -226,10 +226,10 @@ export async function deactivateSkill(slug: string): Promise<boolean> {
 
 /** Soft-delete a forged skill (staged or active) → .trash. */
 export async function deleteForgedSkill(slug: string): Promise<boolean> {
+  if (!isSafeSlug(slug)) return false;
   for (const base of [skillsRoot(), stagedRoot()]) {
     const dir = join(base, slug);
     if (!contains(base, dir)) continue; // anti-traversal
-    if (!existsSync(join(dir, "SKILL.md"))) continue;
     if (!(await realContained(base, dir))) continue; // symlink guard
     if (!(await isForgedDir(dir))) continue;
     const trash = join(odinSkillsDir(), ".trash");

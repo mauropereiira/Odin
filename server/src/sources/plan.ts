@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { paths } from "../claudePaths.js";
 
 /**
@@ -19,11 +19,7 @@ export interface PlanInfo {
   opusDefault: boolean;
 }
 
-interface Cached {
-  mtimeMs: number;
-  info: PlanInfo;
-}
-let cache: Cached | null = null;
+let lastGood: PlanInfo | null = null;
 
 function str(v: unknown): string | null {
   return typeof v === "string" && v ? v : null;
@@ -46,9 +42,6 @@ export const plan = {
 
   async get(): Promise<PlanInfo> {
     try {
-      const mtimeMs = (await stat(paths.configJson)).mtimeMs;
-      if (cache?.mtimeMs === mtimeMs) return cache.info;
-
       const raw = JSON.parse(await readFile(paths.configJson, "utf8")) as Record<string, unknown>;
       const account = (raw.oauthAccount as Record<string, unknown>) || {};
       const passes = raw.passesLastSeenRemaining;
@@ -63,14 +56,14 @@ export const plan = {
         guestPassesRemaining: typeof passes === "number" ? passes : null,
         opusDefault: raw.hasOpusPlanDefault === true,
       };
-      cache = { mtimeMs, info };
+      lastGood = info;
       return info;
     } catch {
-      return cache?.info ?? EMPTY;
+      return lastGood ?? EMPTY;
     }
   },
 
   invalidate() {
-    cache = null;
+    lastGood = null;
   },
 };

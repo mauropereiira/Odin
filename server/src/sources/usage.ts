@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { sessions } from "./sessions.js";
 import { addTokens, emptyTokens } from "../pricing.js";
 import { paths } from "../claudePaths.js";
@@ -8,11 +8,6 @@ import type { DailyPoint, TokenTotals, UsageReport } from "../types.js";
  * Aggregate usage from the already-parsed session source and Claude's daily
  * activity cache. This source only reads Claude's state and returns plain DTOs.
  */
-
-interface CachedStats {
-  mtimeMs: number;
-  dailyActivity: DailyActivity[];
-}
 
 interface DailyActivity {
   date: string;
@@ -26,7 +21,7 @@ interface UsageTotal extends TokenTotals {
 }
 
 const DAYS = 45;
-let statsCache: CachedStats | null = null;
+let statsCache: DailyActivity[] | null = null;
 let reportCache: { day: string; report: UsageReport } | null = null;
 let lastGoodReport: UsageReport | null = null;
 
@@ -61,10 +56,8 @@ function number(value: unknown): number {
 }
 
 async function readDailyActivity(): Promise<DailyActivity[]> {
+  if (statsCache) return statsCache;
   try {
-    const mtimeMs = (await stat(paths.statsCache)).mtimeMs;
-    if (statsCache?.mtimeMs === mtimeMs) return statsCache.dailyActivity;
-
     const parsed = JSON.parse(await readFile(paths.statsCache, "utf8")) as unknown;
     if (!parsed || typeof parsed !== "object") return [];
     const rows = (parsed as Record<string, unknown>).dailyActivity;
@@ -82,7 +75,7 @@ async function readDailyActivity(): Promise<DailyActivity[]> {
         toolCallCount: number(activity.toolCallCount),
       });
     }
-    statsCache = { mtimeMs, dailyActivity };
+    statsCache = dailyActivity;
     return dailyActivity;
   } catch {
     statsCache = null;

@@ -7,12 +7,7 @@ import type { ProjectCard, SessionSummary } from "../types.js";
 
 /** Build one read-only project card for every encoded Claude project directory. */
 
-interface CachedConfig {
-  mtimeMs: number;
-  value: Record<string, unknown>;
-}
-
-let configCache: CachedConfig | null = null;
+let configCache: Record<string, unknown> | null = null;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -21,11 +16,10 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 
 async function readConfig(): Promise<Record<string, unknown>> {
+  if (configCache) return configCache;
   try {
-    const mtimeMs = (await stat(paths.configJson)).mtimeMs;
-    if (configCache?.mtimeMs === mtimeMs) return configCache.value;
     const parsed = record(JSON.parse(await readFile(paths.configJson, "utf8")) as unknown) || {};
-    configCache = { mtimeMs, value: parsed };
+    configCache = parsed;
     return parsed;
   } catch {
     configCache = null;
