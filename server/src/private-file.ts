@@ -63,7 +63,7 @@ export async function readPrivateTextFile(
 ): Promise<{ contents: string; mtimeMs: number } | null> {
   let handle: FileHandle;
   try {
-    handle = await open(path, constants.O_RDONLY | NO_FOLLOW);
+    handle = await open(path, constants.O_RDONLY | NO_FOLLOW | NON_BLOCK);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return null;
