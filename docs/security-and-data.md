@@ -32,6 +32,23 @@ Not provided:
 Do not expose Odin through a tunnel, reverse proxy, port forward, container-published port, or
 LAN-facing listener.
 
+## Demo Isolation
+
+Starting Odin through `npm run demo` sets `ODIN_DEMO=1` and creates a separate server boundary for
+public evaluation and browser testing:
+
+- Responses come only from fixed synthetic fixtures held in memory.
+- Provider adapters, provider health checks, filesystem watchers, conversations, Fleet, Brain,
+  skills, personal notes, and live WebSocket snapshots are not initialized.
+- API requests using methods other than `GET` or `HEAD` receive `403 ODIN_DEMO_READ_ONLY`.
+- Unknown API routes receive `404 ODIN_DEMO_NOT_FOUND` rather than falling through to a live handler.
+- Demo responses use `Cache-Control: no-store` and `X-Odin-Mode: demo`.
+- The normal loopback `Host` and `Origin` checks still run before demo routing.
+
+The interface also disables known write controls, but that is a usability measure rather than the
+security boundary. The server rejects direct mutation requests independently. Automated integration
+tests reject imports of live subsystem modules and verify configured canary storage remains untouched.
+
 ## Provider Data Flow
 
 Converse and Fleet send the user prompt and assembled system instructions to the selected provider.

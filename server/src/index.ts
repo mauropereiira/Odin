@@ -51,6 +51,7 @@ import {
   stopAgent,
 } from "./fleet.js";
 import type { ChangeEvent } from "./types.js";
+import { isLoopbackHost, isLoopbackOrigin, isRequestNamespace } from "./security.js";
 
 const PORT = Number(process.env.HELM_PORT || 7420);
 const CHECKOUT_ROOT = fileURLToPath(new URL("../../", import.meta.url)).replace(/\/$/, "");
@@ -66,38 +67,12 @@ interface Sock {
 
 const app = Fastify({ logger: false });
 
-/**
- * Loopback-only guard. Odin drives a real agent with tool access, so we must
- * ensure requests actually originate from this machine's browser — not from a
- * malicious page using DNS-rebinding (which defeats binding to 127.0.0.1 alone)
- * or a cross-origin fetch. We reject any request whose Host, or Origin when
- * present, is not a loopback address. Runs for the API and the WS upgrade.
- */
-function isLoopbackHost(value: string | undefined): boolean {
-  if (!value) return false;
-  let host = value.trim();
-  if (host.startsWith("[")) {
-    host = host.slice(1, host.indexOf("]")); // [::1]:7420 → ::1
-  } else {
-    const colon = host.lastIndexOf(":");
-    if (colon !== -1 && host.indexOf(":") === colon) host = host.slice(0, colon);
-  }
-  return host === "localhost" || host === "127.0.0.1" || host === "::1";
-}
-
 app.addHook("onRequest", async (req, reply) => {
   if (!isLoopbackHost(req.headers.host)) {
     return reply.code(403).send({ error: "Forbidden: non-loopback host" });
   }
-  const origin = req.headers.origin;
-  if (origin) {
-    let ok = false;
-    try {
-      ok = isLoopbackHost(new URL(origin).host);
-    } catch {
-      ok = false;
-    }
-    if (!ok) return reply.code(403).send({ error: "Forbidden: cross-origin request" });
+  if (!isLoopbackOrigin(req.headers.origin)) {
+    return reply.code(403).send({ error: "Forbidden: cross-origin request" });
   }
 });
 
@@ -172,13 +147,11 @@ const sourceById: Record<string, { invalidate?: () => void }> = {
   skills,
 };
 
-// Odin's brain lives in a Moldavite Forge; make sure it exists before we serve.
+let watcher: ReturnType<typeof startWatcher> | null = null;
 await ensureForge();
-// Odin's forged-skills plugin — ensure it exists so --plugin-dir loads cleanly.
 await ensureOdinPlugin();
 await initializeFleet();
-
-const watcher = startWatcher((evt) => {
+watcher = startWatcher((evt) => {
   sourceById[evt.source]?.invalidate?.();
   broadcast(evt);
 });
@@ -187,6 +160,8 @@ const watcher = startWatcher((evt) => {
 app.get("/api/health", async () => ({
   ok: true,
   service: "odin",
+  mode: "live",
+  readOnly: false,
   port: PORT,
   instanceId: process.env.ODIN_INSTANCE_ID ?? null,
   checkoutRoot: CHECKOUT_ROOT,
@@ -224,6 +199,7 @@ app.get("/api/capabilities", async () => {
     },
     conversations: { persistent: true },
     fleet: { persistent: true },
+    runtime: { mode: "live", readOnly: false },
   };
 });
 
@@ -598,7 +574,7 @@ app.delete<{ Params: { id: string } }>("/api/agents/:id", async (req, reply) => 
 app.register(async (instance) => {
   instance.get("/ws", { websocket: true }, (socket: Sock) => {
     clients.add(socket);
-    socket.send(JSON.stringify({ kind: "hello", at: new Date().toISOString() }));
+    socket.send(JSON.stringify({ kind: "hello", at: new Date().toISOString(), demo: false }));
     socket.on("close", () => clients.delete(socket));
     socket.on("error", () => clients.delete(socket));
   });
@@ -613,7 +589,11 @@ if (existsSync(webDist)) {
   // so a fresh `npm run build` is picked up without restarting the server.
   await app.register(fastifyStatic, { root: webDist });
   app.setNotFoundHandler((req, reply) => {
-    if (req.method === "GET" && !req.url.startsWith("/api") && !req.url.startsWith("/ws")) {
+    if (
+      (req.method === "GET" || req.method === "HEAD")
+      && !isRequestNamespace(req.url, "/api")
+      && !isRequestNamespace(req.url, "/ws")
+    ) {
       return reply.sendFile("index.html"); // SPA client routes (/brain, /skills, …)
     }
     return reply.code(404).send({ error: "not found" });
@@ -634,9 +614,9 @@ let shuttingDown = false;
 async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
-  await stopAllConversations();
   for (const socket of clients) socket.close();
-  await watcher.close().catch(() => undefined);
+  await stopAllConversations();
+  await watcher?.close().catch(() => undefined);
   await app.close().catch(() => undefined);
   await Promise.race([
     rememberQueue,

@@ -25,6 +25,10 @@ view of local Claude Code activity in one dashboard.
 
 ![Odin Brain with synthetic memories](docs/images/brain.png)
 
+Open Brain's expanded memory constellation to filter memories by type, zoom with the controls,
+mouse wheel, or `+` and `-`, and pan by dragging. Arrow keys move between nodes, `Enter` opens a
+memory, and `0` resets the view.
+
 ## Provider Support
 
 | Capability | Claude Code | Codex |
@@ -65,6 +69,19 @@ npm start
 ```
 
 The production server serves the dashboard at `http://127.0.0.1:7420`.
+
+### Try the Synthetic Demo
+
+The built-in read-only demo does not require a configured provider and does not inspect live Claude,
+Codex, Brain, conversation, Fleet, skill, note, or credential state:
+
+```bash
+npm run demo
+```
+
+Open `http://127.0.0.1:7420`. A persistent `Demo · read only` badge identifies the mode. Every
+dashboard response comes from a fixed in-memory fixture, write controls are disabled, and the server
+rejects API mutations. Set `HELM_PORT` before the command to use another port.
 
 See [Setup](docs/setup.md) for provider authentication, environment variables, optional notes,
 production operation, and the macOS app installer.
@@ -158,6 +175,10 @@ npm run test
 npm run build
 # or both
 npm run check
+
+# one-time browser install, then the complete suite
+npx playwright install chromium
+npm run check:all
 ```
 
 The repository is an npm workspace with `server/` and `web/` packages. See
@@ -166,9 +187,9 @@ fixtures and screenshots.
 
 ## Project Status
 
-Odin is early-stage software. The local API is unversioned, automated tests currently focus on the
-server's persistence, provider normalization, memory, and skill boundaries, and the macOS launcher
-is the only packaged desktop flow.
+Odin is early-stage software. The local API is unversioned. Automated tests cover persistence,
+provider normalization, memory and skill boundaries, loopback request security, demo isolation, and
+desktop/mobile browser flows. The macOS launcher is the only packaged desktop flow.
 
 ## License
 

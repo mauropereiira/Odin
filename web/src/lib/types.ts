@@ -133,6 +133,7 @@ export interface ProviderCapability {
 }
 
 export interface OdinCapabilities {
+  runtime: { mode: "live" | "demo"; readOnly: boolean };
   providers: Array<{
     id: ProviderId;
     label: string;
@@ -144,6 +145,11 @@ export interface OdinCapabilities {
   skills: { enabled: boolean; active: number };
   conversations: { persistent: boolean };
   fleet: { persistent: boolean };
+}
+
+export interface OdinRuntime {
+  mode: "live" | "demo";
+  readOnly: boolean;
 }
 
 export interface AgentEvent extends Record<string, unknown> {

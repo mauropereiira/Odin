@@ -13,12 +13,14 @@ import { Markdown } from "../components/Markdown";
 import { ProviderBadge } from "../components/ProviderBadge";
 import { Modal } from "../components/Modal";
 import { ToolChip } from "../components/ToolChip";
+import { useDemoMode } from "../lib/useDemoMode";
 import { EmptyState, MicroLabel, Pill, Skeleton } from "../components/ui";
 
 const controlClass =
   "h-9 w-full rounded-lg border border-line bg-panel-2 px-3 readout text-xs text-ink outline-none transition-colors hover:border-line-strong focus:border-clay/60 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function Fleet() {
+  const readOnly = useDemoMode();
   const { data: projects = [] } = useQuery({ queryKey: qk.projects, queryFn: api.projects });
   const providersQuery = useQuery({ queryKey: qk.providers, queryFn: api.providers });
   const fleet = useFleet();
@@ -34,7 +36,9 @@ export function Fleet() {
         <button
           type="button"
           onClick={() => setDispatchOpen(true)}
-          className="flex items-center gap-2 rounded-lg bg-clay px-3 py-2 readout text-xs text-void transition-colors hover:bg-clay-bright"
+          disabled={readOnly}
+          title={readOnly ? "Demo mode is read-only" : undefined}
+          className="flex items-center gap-2 rounded-lg bg-clay px-3 py-2 readout text-xs text-void transition-colors hover:bg-clay-bright disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Plus size={14} /> Dispatch agent
         </button>
@@ -67,6 +71,7 @@ export function Fleet() {
               onStop={fleet.stop}
               onRemove={fleet.remove}
               pending={fleet.pending[agent.info.id]}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -81,7 +86,8 @@ export function Fleet() {
             <button
               type="button"
               onClick={() => setDispatchOpen(true)}
-              className="flex items-center gap-2 rounded-lg border border-clay/30 bg-clay/10 px-3 py-2 readout text-xs text-clay transition-colors hover:bg-clay/15"
+              disabled={readOnly}
+              className="flex items-center gap-2 rounded-lg border border-clay/30 bg-clay/10 px-3 py-2 readout text-xs text-clay transition-colors hover:bg-clay/15 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Plus size={13} /> Dispatch agent
             </button>
@@ -111,6 +117,7 @@ function AgentTerminal({
   onStop,
   onRemove,
   pending,
+  readOnly,
 }: {
   agent: FleetAgent;
   index: number;
@@ -118,6 +125,7 @@ function AgentTerminal({
   onStop: (id: string) => Promise<boolean>;
   onRemove: (id: string) => Promise<boolean>;
   pending?: FleetMutation;
+  readOnly: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -131,7 +139,7 @@ function AgentTerminal({
 
   const submit = async () => {
     const message = draft.trim();
-    if (!message || active) return;
+    if (readOnly || !message || active) return;
     setDraft("");
     const sent = await onPrompt(agent.info.id, message);
     if (!sent) setDraft(message);
@@ -163,7 +171,7 @@ function AgentTerminal({
                 void onRemove(agent.info.id);
               }
             }}
-            disabled={Boolean(pending) || active}
+            disabled={readOnly || Boolean(pending) || active}
             title={active ? "Stop this agent before removing it" : "Remove agent"}
             aria-label={`Remove ${agent.info.title}`}
             className="rounded-md p-1 text-ink-faint transition-colors hover:bg-panel-2 hover:text-rose disabled:cursor-not-allowed disabled:opacity-30"
@@ -258,15 +266,15 @@ function AgentTerminal({
             onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
               if (event.key === "Enter" && !event.nativeEvent.isComposing) void submit();
             }}
-            disabled={active || Boolean(pending)}
-            placeholder={active ? "Agent is working…" : "Prompt this agent…"}
+            disabled={readOnly || active || Boolean(pending)}
+            placeholder={readOnly ? "Demo mode is read-only" : active ? "Agent is working…" : "Prompt this agent…"}
             className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-panel-2 px-3 text-xs text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-clay/60 disabled:cursor-not-allowed disabled:opacity-50"
           />
           {active ? (
             <button
               type="button"
               onClick={() => void onStop(agent.info.id)}
-              disabled={Boolean(pending)}
+              disabled={readOnly || Boolean(pending)}
               className="flex h-9 items-center gap-1.5 rounded-lg border border-amber/30 px-3 readout text-[10px] text-amber transition-colors hover:bg-amber/10 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Square size={10} fill="currentColor" /> {pending === "stop" ? "Stopping…" : "Stop"}
@@ -275,7 +283,7 @@ function AgentTerminal({
             <button
               type="button"
               onClick={() => void submit()}
-              disabled={!draft.trim() || Boolean(pending)}
+              disabled={readOnly || !draft.trim() || Boolean(pending)}
               aria-label="Prompt agent"
               className="flex h-9 items-center rounded-lg bg-clay px-3 text-void transition-colors hover:bg-clay-bright disabled:cursor-not-allowed disabled:opacity-35"
             >

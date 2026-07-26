@@ -10,6 +10,7 @@ import type {
   MemoryGraph,
   Overview,
   OdinCapabilities,
+  OdinRuntime,
   ProviderCapability,
   ProviderId,
   SkillsReport,
@@ -74,6 +75,7 @@ export interface CreateAgentRequest {
 
 export const api = {
   overview: () => get<Overview>("/api/overview"),
+  runtime: () => get<OdinRuntime>("/api/health"),
   providers: () => get<ProviderCapability[]>("/api/providers"),
   capabilities: () => get<OdinCapabilities>("/api/capabilities"),
   sessions: () => get<SessionSummary[]>("/api/sessions"),
@@ -120,6 +122,7 @@ export const api = {
 /** Query keys — the WS live feed invalidates these by source name. */
 export const qk = {
   overview: ["overview"] as const,
+  runtime: ["runtime"] as const,
   providers: ["providers"] as const,
   capabilities: ["capabilities"] as const,
   sessions: ["sessions"] as const,

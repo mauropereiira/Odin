@@ -27,6 +27,7 @@ export function useLiveFeed() {
       socket.onopen = () => {
         setStatus("live");
         qc.invalidateQueries({ queryKey: qk.providers });
+        qc.invalidateQueries({ queryKey: qk.runtime });
         qc.invalidateQueries({ queryKey: qk.capabilities });
       };
       socket.onclose = () => {

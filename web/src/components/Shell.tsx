@@ -51,6 +51,10 @@ export function Shell() {
     queryFn: api.overview,
     refetchInterval: 30_000,
   });
+  const { data: runtime } = useQuery({
+    queryKey: qk.runtime,
+    queryFn: api.runtime,
+  });
 
   return (
     <div className="flex h-full">
@@ -61,6 +65,7 @@ export function Shell() {
           activeNow={overview?.sessions.activeNow ?? 0}
           todayCost={overview?.usage.todayCost ?? 0}
           rateLimit={overview?.rateLimit ?? null}
+          demo={runtime?.mode === "demo"}
           booting={booting}
           onOpenPalette={() => setPaletteOpen(true)}
         />
@@ -142,6 +147,7 @@ function TelemetryBar({
   activeNow,
   todayCost,
   rateLimit,
+  demo,
   booting,
   onOpenPalette,
 }: {
@@ -149,6 +155,7 @@ function TelemetryBar({
   activeNow: number;
   todayCost: number;
   rateLimit: RateLimitInfo | null;
+  demo: boolean;
   booting: boolean;
   onOpenPalette: () => void;
 }) {
@@ -163,6 +170,11 @@ function TelemetryBar({
     >
       <div className="flex items-center gap-4 text-xs text-ink-dim">
         <span className="micro-label hidden sm:inline">Odin Agent Control Center</span>
+        {demo && (
+          <span className="rounded-md border border-amber/30 bg-amber/10 px-2 py-1 readout text-[9px] uppercase tracking-wider text-amber">
+            Demo · read only
+          </span>
+        )}
         <button
           type="button"
           onClick={onOpenPalette}

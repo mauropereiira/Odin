@@ -44,7 +44,9 @@ flowchart TB
 
 ```text
 server/
-  src/index.ts          HTTP, WebSocket, startup, and shutdown
+  src/main.ts           Selects the isolated demo or live server entry point
+  src/index.ts          Live HTTP, WebSocket, startup, and shutdown
+  src/demo-server.ts    Synthetic read-only HTTP and WebSocket boundary
   src/providers/        Provider adapters and normalized event types
   src/sources/          Read-only local telemetry and dashboard DTOs
   src/converse.ts       Conversation metadata and transcript persistence

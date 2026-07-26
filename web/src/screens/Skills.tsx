@@ -5,8 +5,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api, qk } from "../lib/api";
 import type { SkillInfo } from "../lib/types";
 import { Markdown } from "../components/Markdown";
+import { useDemoMode } from "../lib/useDemoMode";
 
 export function Skills() {
+  const readOnly = useDemoMode();
   const qc = useQueryClient();
   const refresh = () => qc.invalidateQueries({ queryKey: qk.skills });
   const [query, setQuery] = useState("");
@@ -111,11 +113,11 @@ export function Skills() {
                       setPending(null);
                     }
                   }}
-                  disabled={pending === s.path}
+                  disabled={readOnly || pending === s.path}
                   className={`flex items-center gap-1 text-xs ${
                     s.active ? "text-ink-faint hover:text-ink-dim" : "text-teal hover:text-teal/80"
                   }`}
-                  title={s.active ? "Deactivate (unload)" : "Activate (let Odin use it)"}
+                  title={readOnly ? "Demo mode is read-only" : s.active ? "Deactivate (unload)" : "Activate (let Odin use it)"}
                 >
                   <Power size={13} />
                   {s.active ? "Deactivate" : "Activate"}
@@ -135,9 +137,9 @@ export function Skills() {
                       setPending(null);
                     }
                   }}
-                  disabled={pending === s.path}
+                  disabled={readOnly || pending === s.path}
                   className="flex items-center gap-1 text-xs text-ink-faint hover:text-rose"
-                  title="Delete forged skill"
+                  title={readOnly ? "Demo mode is read-only" : "Delete forged skill"}
                 >
                   <Trash2 size={13} />
                 </button>

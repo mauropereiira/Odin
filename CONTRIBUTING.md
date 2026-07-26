@@ -26,11 +26,13 @@ The npm workspace contains:
 Run the complete local check before opening a pull request:
 
 ```bash
-npm run check
+npx playwright install chromium # first run only
+npm run check:all
 ```
 
-Server tests can be run independently with `npm run test`; watch mode is available through
-`npm run test:watch --workspace server`.
+`npm run check` runs server tests and both production builds without browser tests. Server tests can
+be run independently with `npm run test`; browser tests use `npm run test:e2e`, and server watch mode
+is available through `npm run test:watch --workspace server`.
 
 ## Engineering Guidelines
 

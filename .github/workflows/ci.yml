@@ -17,4 +17,15 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Reject critical dependency advisories
+        run: npm audit --audit-level=critical
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - run: npm run check:all
+      - name: Upload browser report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

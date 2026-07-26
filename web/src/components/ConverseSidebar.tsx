@@ -6,10 +6,12 @@ import { relativeTime } from "../lib/format";
 import type { ConverseSession } from "../lib/types";
 import { ProviderBadge } from "./ProviderBadge";
 import { useConverse } from "./ConverseProvider";
+import { useDemoMode } from "../lib/useDemoMode";
 
 export function ConverseSidebar() {
   const queryClient = useQueryClient();
   const conversation = useConverse();
+  const readOnly = useDemoMode();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export function ConverseSidebar() {
     ?? (sessionsQuery.error instanceof Error ? sessionsQuery.error.message : null);
 
   const remove = async (session: ConverseSession) => {
-    if (running || conversation.resumeLoadingId || deletingId) return;
+    if (readOnly || running || conversation.resumeLoadingId || deletingId) return;
     if (!window.confirm(`Permanently delete "${session.title}" and its transcript? This cannot be undone.`)) return;
     const previous = queryClient.getQueryData<ConverseSession[]>(qk.converseSessions);
     setDeleteError(null);
@@ -112,9 +114,9 @@ export function ConverseSidebar() {
               <button
                 type="button"
                 onClick={() => void remove(session)}
-                disabled={running || Boolean(conversation.resumeLoadingId) || Boolean(deletingId)}
+                disabled={readOnly || running || Boolean(conversation.resumeLoadingId) || Boolean(deletingId)}
                 className="rounded p-0.5 text-ink-faint opacity-60 transition-colors hover:text-rose disabled:cursor-not-allowed disabled:opacity-25 lg:opacity-0 lg:group-hover:opacity-100 lg:focus:opacity-100"
-                title="Permanently delete transcript"
+                title={readOnly ? "Demo mode is read-only" : "Permanently delete transcript"}
                 aria-label={`Permanently delete ${session.title}`}
               >
                 {deletingId === session.id

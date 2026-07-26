@@ -62,6 +62,32 @@ npm start
 The production server serves `web/dist` at `http://127.0.0.1:7420`. `npm start` does not build
 first, so rerun `npm run build` after source changes.
 
+## Read-Only Demo
+
+Use the synthetic demo to evaluate the complete interface without configured providers or access to
+live local state:
+
+```bash
+npm run demo
+```
+
+This builds the dashboard and starts it at `http://127.0.0.1:7420` with `ODIN_DEMO=1`. The mode:
+
+- Serves a fixed in-memory dataset across every dashboard screen.
+- Does not initialize providers, watchers, conversations, Fleet, Brain, skills, or personal notes.
+- Does not read Claude, Codex, credential, or configured Odin data directories.
+- Rejects every API mutation and any API route missing from the explicit demo fixture.
+- Retains the normal loopback `Host` and `Origin` protections.
+
+Use a different port when needed:
+
+```bash
+HELM_PORT=17420 npm run demo
+```
+
+The header always displays `Demo · read only` in this mode. Do not use that badge alone as a security
+control; the server-side API boundary enforces read-only behavior independently.
+
 ## Optional Moldavite Notes
 
 Odin's Brain is plain Markdown and works without the Moldavite application running. If the Moldavite
@@ -116,10 +142,11 @@ bash scripts/uninstall.sh
 The uninstaller removes the app, launcher state, launcher logs, and only its recorded server. It does
 not erase conversations, Fleet state, Brain notes, forged skills, Claude history, or Codex history.
 
-## Isolated Profiles
+## Isolated Live Profiles
 
-For tests, demos, or screenshots, set a disposable `HOME` and override every data root before the
-server starts:
+The built-in demo is the safest option for interface tests, demos, and screenshots. To test actual
+provider behavior against disposable live state instead, set a temporary `HOME` and override every
+data root before the server starts:
 
 ```bash
 HOME=/tmp/odin-demo/home \

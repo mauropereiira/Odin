@@ -12,11 +12,13 @@ import { ProviderBadge } from "../components/ProviderBadge";
 import { MicroLabel, Pill, Skeleton } from "../components/ui";
 import { Markdown } from "../components/Markdown";
 import { ToolChip } from "../components/ToolChip";
+import { useDemoMode } from "../lib/useDemoMode";
 
 const controlClass =
   "h-9 rounded-lg border border-line bg-panel-2 px-3 readout text-xs text-ink outline-none transition-colors hover:border-line-strong focus:border-clay/60 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function Converse() {
+  const readOnly = useDemoMode();
   const [searchParams] = useSearchParams();
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: qk.projects,
@@ -69,13 +71,13 @@ export function Converse() {
 
   const submit = () => {
     const message = draft.trim();
-    if (!message || !cwd || running || resuming || !providerReady) return;
+    if (readOnly || !message || !cwd || running || resuming || !providerReady) return;
     setDraft("");
     void conversation.send(message);
   };
 
   const startWith = (message: string) => {
-    if (!cwd || running || resuming || !providerReady) return;
+    if (readOnly || !cwd || running || resuming || !providerReady) return;
     void conversation.send(message);
   };
 
@@ -126,7 +128,7 @@ export function Converse() {
           ) : (
             <ConversationEmpty
               project={selectedProject?.label}
-              disabled={!cwd || !providerReady || resuming}
+              disabled={readOnly || !cwd || !providerReady || resuming}
               onSelect={startWith}
             />
           )}
@@ -248,8 +250,8 @@ export function Converse() {
                   }
                 }}
                 rows={2}
-                placeholder={running ? "Odin is working…" : "Tell Odin what to do…"}
-                disabled={running || resuming || !providerReady}
+                placeholder={readOnly ? "Demo mode is read-only" : running ? "Odin is working…" : "Tell Odin what to do…"}
+                disabled={readOnly || running || resuming || !providerReady}
                 className="min-h-[54px] min-w-0 flex-1 resize-none rounded-xl border border-line bg-panel-2 px-3 py-2.5 text-sm leading-5 text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-clay/60 disabled:cursor-not-allowed disabled:opacity-60"
               />
               {running && (
@@ -264,7 +266,7 @@ export function Converse() {
               <button
                 type="button"
                 onClick={submit}
-                disabled={!draft.trim() || !cwd || running || resuming || !providerReady}
+                disabled={readOnly || !draft.trim() || !cwd || running || resuming || !providerReady}
                 className="flex h-[54px] items-center gap-2 rounded-xl bg-clay px-4 readout text-xs text-void transition-colors hover:bg-clay-bright disabled:cursor-not-allowed disabled:opacity-35"
               >
                 <Send size={14} /> Send

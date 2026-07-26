@@ -6,9 +6,11 @@ import { Markdown } from "../components/Markdown";
 import { Modal } from "../components/Modal";
 import { MemoryGraph } from "../components/MemoryGraph";
 import type { Memory } from "../lib/types";
+import { useDemoMode } from "../lib/useDemoMode";
 
 export function Brain() {
   const queryClient = useQueryClient();
+  const readOnly = useDemoMode();
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [captureOpen, setCaptureOpen] = useState(false);
@@ -49,7 +51,9 @@ export function Brain() {
               setActionError(null);
               setCaptureOpen(true);
             }}
-            className="flex items-center gap-2 rounded-lg bg-clay px-3 py-2 readout text-xs text-void transition-colors hover:bg-clay-bright"
+            disabled={readOnly}
+            title={readOnly ? "Demo mode is read-only" : undefined}
+            className="flex items-center gap-2 rounded-lg bg-clay px-3 py-2 readout text-xs text-void transition-colors hover:bg-clay-bright disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus size={14} /> Capture
           </button>
@@ -140,7 +144,9 @@ export function Brain() {
                   setActionError(cause instanceof Error ? cause.message : "Unable to forget memory.");
                 }
               }}
-              className="flex items-center gap-1 text-xs text-ink-faint hover:text-rose"
+              disabled={readOnly}
+              title={readOnly ? "Demo mode is read-only" : undefined}
+              className="flex items-center gap-1 text-xs text-ink-faint hover:text-rose disabled:cursor-not-allowed disabled:opacity-35"
             >
               <Trash2 size={13} /> Forget
             </button>
@@ -154,14 +160,14 @@ export function Brain() {
 
       {graphOpen && graph.data && graph.data.nodes.length > 0 && (
         <Modal labelledBy="expanded-memory-graph-title" onClose={() => setGraphOpen(false)}>
-          <section className="panel flex h-[88vh] w-full max-w-6xl flex-col overflow-hidden shadow-2xl">
+          <section className="panel flex h-[calc(100dvh-2rem)] w-full max-w-6xl flex-col overflow-hidden shadow-2xl sm:h-[88vh]">
             <header className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3 sm:px-5">
               <div>
                 <h2 id="expanded-memory-graph-title" className="text-base font-semibold text-ink">
                   Memory constellation
                 </h2>
                 <p className="mt-0.5 text-xs text-ink-dim">
-                  Select a node to open its memory.
+                  Filter clusters, zoom, pan, or select a node to open its memory.
                 </p>
               </div>
               <button
@@ -174,7 +180,7 @@ export function Brain() {
                 <X size={16} />
               </button>
             </header>
-            <div className="min-h-0 flex-1 p-3 sm:p-6">
+            <div className="min-h-0 flex-1 p-2 sm:p-5">
               <MemoryGraph
                 graph={graph.data}
                 expanded

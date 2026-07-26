@@ -17,10 +17,14 @@
     "dev:web": "npm run dev --workspace web",
     "build": "npm run build --workspace server && npm run build --workspace web",
     "start": "npm run start --workspace server",
+    "demo": "npm run build && ODIN_DEMO=1 npm start",
     "test": "npm test --workspace server",
-    "check": "npm run test && npm run build"
+    "test:e2e": "npm run build && playwright test",
+    "check": "npm run test && npm run build",
+    "check:all": "npm run test && npm run test:e2e"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "concurrently": "^9.1.0"
   }
 }
