@@ -7,7 +7,7 @@ state, so correctness, privacy, and explicit security boundaries take priority o
 
 Requirements:
 
-- Node.js 20 or newer
+- Node.js 20.19+, 22.12+, or 24+ (Node.js 21 and 23 are not supported)
 - npm
 
 ```bash

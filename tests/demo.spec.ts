@@ -49,6 +49,25 @@ test("demo mode disables live mutations", async ({ page }) => {
   await expect(skillMutation).toBeDisabled();
 });
 
+test("telemetry charts render without overflow", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+
+  await page.goto("/");
+  const overviewChart = page.locator(".recharts-wrapper").first();
+  await expect(overviewChart).toBeVisible();
+  expect(await overviewChart.locator("path").count()).toBeGreaterThan(0);
+
+  await page.goto("/usage");
+  const usageChart = page.locator(".recharts-wrapper").first();
+  await expect(usageChart).toBeVisible();
+  await expect.poll(() => usageChart.locator("path").count()).toBeGreaterThan(20);
+  expect(await page.evaluate(() => document.body.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test("expanded memory graph supports filters, zoom, keyboard navigation, and focus return", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {

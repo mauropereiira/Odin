@@ -49,7 +49,7 @@ uses that runtime's existing authentication, and normalizes streaming events for
 
 Requirements:
 
-- Node.js 20 or newer
+- Node.js 20.19+, 22.12+, or 24+ (Node.js 21 and 23 are not supported)
 - npm
 - Claude Code and/or Codex configured on the local machine
 
@@ -165,6 +165,7 @@ moving the checkout or changing the configured port.
 - [Security and Data](docs/security-and-data.md)
 - [Configuration and API Reference](docs/reference.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security Policy](SECURITY.md)
 

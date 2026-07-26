@@ -14,7 +14,7 @@ export function useLiveFeed() {
   const qc = useQueryClient();
   const [status, setStatus] = useState<LiveStatus>("connecting");
   const [lastChange, setLastChange] = useState<{ source: string; at: string } | null>(null);
-  const retry = useRef<ReturnType<typeof setTimeout>>();
+  const retry = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     let socket: WebSocket | null = null;

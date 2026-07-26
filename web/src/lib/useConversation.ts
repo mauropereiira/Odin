@@ -68,7 +68,7 @@ export function useConversation({
   const [nativeSessionId, setNativeSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
-  const retryRef = useRef<ReturnType<typeof setTimeout>>();
+  const retryRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const activeRunRef = useRef<string | null>(null);
   const activeProviderRef = useRef<ProviderId | null>(null);
   const conversationIdRef = useRef<string | null>(null);
