@@ -24,7 +24,7 @@
     "check:all": "npm run test && npm run test:e2e"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.0",
+    "@playwright/test": "^1.62.1",
     "concurrently": "^9.2.4"
   }
 }
