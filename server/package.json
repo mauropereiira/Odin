@@ -14,7 +14,7 @@
     "@fastify/rate-limit": "^11.1.0",
     "@fastify/static": "^10.1.2",
     "@fastify/websocket": "^11.0.1",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@openai/codex-sdk": "^0.145.0",
     "chokidar": "^5.0.0",
     "fastify": "^5.1.0",
